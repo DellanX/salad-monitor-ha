@@ -2,19 +2,27 @@ from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, MANUFACTURER, MODEL
 
+BINARY_SENSOR_DESCRIPTORS = (
+    ("salad_active", "Salad GPU Active"),
+    ("gpu_reserved", "Salad GPU Reserved"),
+    ("salad_pending", "Salad Workload Pending"),
+    ("is_downloading", "Salad Downloading"),
+    ("bandwidth_active", "Salad Bandwidth Active"),
+    ("miner_active", "Salad Miner Active"),
+)
+
+
+def _state_value(coordinator, key):
+    return coordinator.data.get("state", {}).get(key)
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities(
-        [
-            SaladBinarySensor(coordinator, entry, "salad_active", "Salad GPU Active"),
-            SaladBinarySensor(coordinator, entry, "gpu_reserved", "Salad GPU Reserved"),
-            SaladBinarySensor(
-                coordinator, entry, "salad_pending", "Salad Workload Pending"
-            ),
-        ]
-    )
+    async_add_entities([
+        SaladBinarySensor(coordinator, entry, key, name)
+        for key, name in BINARY_SENSOR_DESCRIPTORS
+    ])
 
 
 class SaladBinarySensor(CoordinatorEntity, BinarySensorEntity):
@@ -38,7 +46,7 @@ class SaladBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def is_on(self):
-        return bool(self.coordinator.data["state"].get(self._key))
+        return bool(_state_value(self.coordinator, self._key))
 
     @property
     def available(self):

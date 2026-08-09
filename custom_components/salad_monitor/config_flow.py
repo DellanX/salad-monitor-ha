@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import aiohttp
 import voluptuous as vol
 
@@ -7,7 +8,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN, DEFAULT_PORT
+from .const import DEFAULT_PORT, DOMAIN, HEALTH_ENDPOINTS
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -18,25 +19,31 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 
 
 async def validate_input(hass: HomeAssistant, data: dict):
-    """Validate the user input by calling /health."""
+    """Validate the user input by calling known health endpoints."""
     host = data["host"]
     port = data["port"]
 
-    url = f"http://{host}:{port}/health"
-
     async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, timeout=5) as resp:
-                if resp.status != 200:
-                    raise CannotConnect
-                payload = await resp.json()
-        except Exception as err:
-            raise CannotConnect from err
+        errors = []
+        for endpoint in HEALTH_ENDPOINTS:
+            url = f"http://{host}:{port}{endpoint}"
+            try:
+                async with session.get(url, timeout=5) as resp:
+                    if resp.status != 200:
+                        errors.append(f"{endpoint}: HTTP {resp.status}")
+                        continue
+                    payload = await resp.json()
+                    if not isinstance(payload, dict):
+                        errors.append(f"{endpoint}: unexpected payload")
+                        continue
+                    return {
+                        "title": f"Salad Monitor ({host}:{port})",
+                        "version": payload.get("version", "unknown"),
+                    }
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+                errors.append(f"{endpoint}: {err}")
 
-    return {
-        "title": f"Salad Monitor ({host}:{port})",
-        "version": payload.get("version", "unknown"),
-    }
+    raise CannotConnect("; ".join(errors))
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
