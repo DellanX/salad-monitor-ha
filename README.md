@@ -4,6 +4,8 @@
 
 This custom integration connects Home Assistant to the Salad GPU Monitor service.
 
+The integration supports both the legacy `/health` endpoint and the new `/api/v1/health` endpoint, and exposes the expanded v1 monitoring state (wallet, job, download, hardware, network, GPU demand, process, and warning metrics) as Home Assistant entities.
+
 ## Installation (HACS)
 
 1. Open HACS → Integrations
